@@ -1,0 +1,118 @@
+enum user_role {
+  patient
+  doctor
+  finance
+  admin
+}
+
+Table users {
+  id            uuid [pk]
+  full_name     varchar [not null]
+  email         varchar [not null, unique]
+  password_hash varchar [not null]
+  phone         varchar
+
+// patient:- if the role is patient then these has a value
+  date_of_birth date [null]
+  gender        varchar [null]
+
+// doctor:- if the role is doctor then these has a value
+  specialty  varchar [null]
+  license_no varchar [null]
+  slot_minutes  int [null]
+}
+
+
+Table user_roles {
+  user_id uuid [not null, ref: > users.id]
+  role    user_role [not null]
+  Note: 'Composite PK to prevent duplicates'
+  indexes {
+    (user_id, role) [pk]    
+  }
+}
+
+
+enum day_of_week {
+  sunday
+  monday
+  tuesday
+  wednesday
+  thursday
+  friday
+  saturday
+}
+
+Table doctor_working_hours {
+  id         uuid [pk]
+  doctor_id  uuid [not null, ref: > users.id]
+  weekday    day_of_week  [not null] 
+  start_time time [not null]
+  end_time   time [not null]
+
+  Note: 'Defines weekly working windows to generate time slots'
+}
+
+
+enum appointment_status {
+  booked
+  cancelled
+  fulfilled
+}
+
+enum VisitType{
+  InClinic
+  FollowUp
+  Consultation
+}
+
+
+Table appointments {
+  id          uuid [pk]
+  patient_id  uuid [not null, ref: > users.id]
+  doctor_id   uuid [not null, ref: > users.id]
+  start_time  timestamptz [not null]
+  end_time    timestamptz [not null]
+  status      appointment_status [not null, default: 'booked']
+  reason      text
+  notes       text
+  VisitType   VisitType
+  created_by  uuid [not null, ref: > users.id]
+  created_at  timestamptz [not null, default: `now()`]
+}
+
+enum encounter_status {
+  planned
+  in_progress
+  completed
+  cancelled
+}
+
+Table visits {
+  id             uuid [pk]
+  appointment_id uuid [unique, ref: - appointments.id] // optional link
+  patient_id     uuid [not null, ref: > users.id]
+  doctor_id      uuid [not null, ref: > users.id]
+  start_time     timestamptz [not null]
+  end_time       timestamptz
+  status         encounter_status [not null, default: 'in_progress']
+  clinical_notes text
+}
+
+Table treatments {
+  id          uuid [pk]
+  visit_id    uuid [not null, ref: > visits.id]
+  code        varchar
+  name        varchar [not null]
+  quantity    decimal(10,2) [not null, default: 1]
+  unit_price  decimal(12,2) [not null, default: 0]
+  total_price decimal(12,2) // احسبه في التطبيق/تريغر: quantity * unit_price
+}
+
+Table invoices {
+  id            uuid [pk]
+  reviewed_by   uuid [ref: > users.id] // موظف Finance (اختياري)
+  visit_id      uuid [not null, unique, ref: > visits.id]
+  total_amount  decimal(12,2) [not null, default: 0]
+  reviewed_at   timestamptz
+}
